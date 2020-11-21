@@ -181,7 +181,7 @@
  * M217 - Set filament swap parameters: "M217 S<length> P<feedrate> R<feedrate>". (Requires SINGLENOZZLE)
  * M218 - Set/get a tool offset: "M218 T<index> X<offset> Y<offset>". (Requires 2 or more extruders)
  * M220 - Set Feedrate Percentage: "M220 S<percent>" (i.e., "FR" on the LCD)
- *        Use "M220 B" to back up the Feedrate Percentage and "M220 R" to restore it. (Requires PRUSA_MMU2)
+ *        Use "M220 B" to back up the Feedrate Percentage and "M220 R" to restore it. (Requires an MMU_MODEL version 2 or 2S)
  * M221 - Set Flow Percentage: "M221 S<percent>"
  * M226 - Wait until a pin is in a given state: "M226 P<pin> S<state>" (Requires DIRECT_PIN_CONTROL)
  * M240 - Trigger a camera to take a photograph. (Requires PHOTO_GCODE)
@@ -230,6 +230,9 @@
  * M512 - Set/Change/Remove Password
  * M524 - Abort the current SD print job started with M24. (Requires SDSUPPORT)
  * M540 - Enable/disable SD card abort on endstop hit: "M540 S<state>". (Requires SD_ABORT_ON_ENDSTOP_HIT)
+ * M552 - Get or set IP address. Enable/disable network interface. (Requires enabled Ethernet port)
+ * M553 - Get or set IP netmask. (Requires enabled Ethernet port)
+ * M554 - Get or set IP gateway. (Requires enabled Ethernet port)
  * M569 - Enable stealthChop on an axis. (Requires at least one _DRIVER_TYPE to be TMC2130/2160/2208/2209/5130/5160)
  * M600 - Pause for filament change: "M600 X<pos> Y<pos> Z<raise> E<first_retract> L<later_retract>". (Requires ADVANCED_PAUSE_FEATURE)
  * M603 - Configure filament change: "M603 T<tool> U<unload_length> L<load_length>". (Requires ADVANCED_PAUSE_FEATURE)
@@ -258,9 +261,9 @@
  * M900 - Get or Set Linear Advance K-factor. (Requires LIN_ADVANCE)
  * M906 - Set or get motor current in milliamps using axis codes X, Y, Z, E. Report values if no axis codes given. (Requires at least one _DRIVER_TYPE defined as TMC2130/2160/5130/5160/2208/2209/2660 or L6470)
  * M907 - Set digital trimpot motor current using axis codes. (Requires a board with digital trimpots)
- * M908 - Control digital trimpot directly. (Requires DAC_STEPPER_CURRENT or DIGIPOTSS_PIN)
- * M909 - Print digipot/DAC current value. (Requires DAC_STEPPER_CURRENT)
- * M910 - Commit digipot/DAC value to external EEPROM via I2C. (Requires DAC_STEPPER_CURRENT)
+ * M908 - Control digital trimpot directly. (Requires HAS_MOTOR_CURRENT_DAC or DIGIPOTSS_PIN)
+ * M909 - Print digipot/DAC current value. (Requires HAS_MOTOR_CURRENT_DAC)
+ * M910 - Commit digipot/DAC value to external EEPROM via I2C. (Requires HAS_MOTOR_CURRENT_DAC)
  * M911 - Report stepper driver overtemperature pre-warn condition. (Requires at least one _DRIVER_TYPE defined as TMC2130/2160/5130/5160/2208/2209/2660)
  * M912 - Clear stepper driver overtemperature pre-warn condition flag. (Requires at least one _DRIVER_TYPE defined as TMC2130/2160/5130/5160/2208/2209/2660)
  * M913 - Set HYBRID_THRESHOLD speed. (Requires HYBRID_THRESHOLD)
@@ -465,10 +468,11 @@ private:
 
   TERN_(DELTA_AUTO_CALIBRATION, static void G33());
 
-  #if ENABLED(Z_STEPPER_AUTO_ALIGN)
+  #if ANY(Z_MULTI_ENDSTOPS, Z_STEPPER_AUTO_ALIGN, MECHANICAL_GANTRY_CALIBRATION)
     static void G34();
-    static void M422();
   #endif
+
+  TERN_(Z_STEPPER_AUTO_ALIGN, static void M422());
 
   TERN_(ASSISTED_TRAMMING, static void G35());
 
@@ -537,7 +541,7 @@ private:
   static void M31();
 
   #if ENABLED(SDSUPPORT)
-    static void M32();
+    TERN_(HAS_MEDIA_SUBCALLS, static void M32());
     TERN_(LONG_FILENAME_HOST_SUPPORT, static void M33());
     #if BOTH(SDCARD_SORT_ALPHA, SDSORT_GCODE)
       static void M34();
@@ -731,7 +735,7 @@ private:
     static void M402();
   #endif
 
-  TERN_(PRUSA_MMU2, static void M403());
+  TERN_(HAS_PRUSA_MMU2, static void M403());
 
   #if ENABLED(FILAMENT_WIDTH_SENSOR)
     static void M404();
@@ -765,17 +769,19 @@ private:
 
   #if ENABLED(PASSWORD_FEATURE)
     static void M510();
-    #if ENABLED(PASSWORD_UNLOCK_GCODE)
-      static void M511();
-    #endif
-    #if ENABLED(PASSWORD_CHANGE_GCODE)
-      static void M512();
-    #endif
+    TERN_(PASSWORD_UNLOCK_GCODE, static void M511());
+    TERN_(PASSWORD_CHANGE_GCODE, static void M512());
   #endif
 
   TERN_(SDSUPPORT, static void M524());
 
   TERN_(SD_ABORT_ON_ENDSTOP_HIT, static void M540());
+
+  #if HAS_ETHERNET
+    static void M552();
+    static void M553();
+    static void M554();
+  #endif
 
   TERN_(BAUD_RATE_GCODE, static void M575());
 
@@ -847,11 +853,11 @@ private:
     static void M918();
   #endif
 
-  #if ANY(HAS_DIGIPOTSS, HAS_MOTOR_CURRENT_PWM, HAS_I2C_DIGIPOT, DAC_STEPPER_CURRENT)
+  #if ANY(HAS_MOTOR_CURRENT_SPI, HAS_MOTOR_CURRENT_PWM, HAS_MOTOR_CURRENT_I2C, HAS_MOTOR_CURRENT_DAC)
     static void M907();
-    #if EITHER(HAS_DIGIPOTSS, DAC_STEPPER_CURRENT)
+    #if EITHER(HAS_MOTOR_CURRENT_SPI, HAS_MOTOR_CURRENT_DAC)
       static void M908();
-      #if ENABLED(DAC_STEPPER_CURRENT)
+      #if ENABLED(HAS_MOTOR_CURRENT_DAC)
         static void M909();
         static void M910();
       #endif
